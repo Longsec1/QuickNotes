@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickNotes</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        header { background: #f4f4f4; padding: 20px; text-align: center; }
+        nav { margin: 20px; }
+        nav a { margin: 10px; text-decoration: none; color: #007BFF; }
+        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; }
+        .note { margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; }
+        .edit-button, .delete-button { cursor: pointer; }
+        .edit-button { color: #007BFF; }
+        .delete-button { color: #FF0000; }
+        .hidden { display: none; }
+        .dark-mode { background-color: #333; color: white; }
+        .dark-mode header { background: #444; }
+        .dark-mode .note { background: #555; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>QuickNotes</h1>
+</header>
+
+<nav>
+    <a href="#home" onclick="showPage('home')">Home</a>
+    <a href="#new-note" onclick="showPage('newNote')">New Note</a>
+    <a href="#saved-notes" onclick="showPage('savedNotes')">Saved Notes</a>
+    <button onclick="toggleTheme()">Toggle Dark Mode</button>
+</nav>
+
+<div id="home" class="container">
+    <h2>Welcome to QuickNotes</h2>
+    <p>Use this app to write, manage, and organize your notes efficiently.</p>
+</div>
+
+<div id="newNote" class="container hidden">
+    <h2>Write a New Note</h2>
+    <textarea id="noteText" rows="5" cols="50" maxlength="200" placeholder="Write your note here..."></textarea><br>
+    <input type="text" id="tagsInput" placeholder="Add tags (comma separated)" /><br>
+    <select id="categorySelect">
+        <option value="Personal">Personal</option>
+        <option value="Work">Work</option>
+        <option value="Ideas">Ideas</option>
+    </select><br>
+    <select id="prioritySelect">
+        <option value="Low">Low</option>
+        <option value="Medium">Medium</option>
+        <option value="High">High</option>
+    </select><br>
+    <button onclick="saveNote()">Save Note</button>
+</div>
+
+<div id="savedNotes" class="container hidden">
+    <h2>Saved Notes</h2>
+    <input type="text" id="searchInput" placeholder="Search notes..." oninput="filterNotes()" />
+    <select id="sortSelect" onchange="sortNotes()">
+        <option value="date">Sort by Date</option>
+        <option value="priority">Sort by Priority</option>
+    </select>
+    <button onclick="exportNotes()">Export Notes</button>
+    <input type="file" id="importFile" accept=".json" onchange="importNotes(event)" />
+    <div id="notesList"></div>
+</div>
+
+<script>
+    const notes = JSON.parse(localStorage.getItem('notes')) || [];
+
+    function showPage(page) {
+        document.querySelectorAll('.container').forEach(container => {
+            container.classList.add('hidden');
+        });
+        document.getElementById(page).classList.remove('hidden');
+        if (page === 'savedNotes') {
+            displayNotes();
+        }
+    }
+
+    function saveNote() {
+        const noteText = document.getElementById('noteText').value;
+        const tags = document.getElementById('tagsInput').value.split(',').map(tag => tag.trim());
+        const category = document.getElementById('categorySelect').value;
+        const priority = document.getElementById('prioritySelect').value;
+
+        if (noteText) {
+            const note = {
+                text: noteText,
+                date: new Date().toLocaleString(),
+                tags: tags,
+                category: category,
+                priority: priority,
+                id: Date.now()
+            };
+            notes.push(note);
+            localStorage.setItem('notes', JSON.stringify(notes));
+            document.getElementById('noteText').value = '';
+            document.getElementById('tagsInput').value = '';
+            alert('Note saved!');
+        } else {
+            alert('Please enter a note.');
+        }
+        displayNotes();
+    }
+
+    function displayNotes() {
+        const notesList = document.getElementById('notesList');
+        notesList.innerHTML = '';
+        notes.forEach(note => {
+            const noteDiv = document.createElement('div');
+            noteDiv.className = 'note';
+            noteDiv.innerHTML = `
+                <p><strong>Note:</strong> ${note.text} <br><strong>Date:</strong> ${note.date}<br>
+                <strong>Category:</strong> ${note.category} <br><strong>Priority:</strong> ${note.priority} <br><strong>Tags:</strong> ${note.tags.join(', ')}</p>
+                <span class="edit-button" onclick="editNote(${note.id})">Edit</span> | 
+                <span class="delete-button" onclick="deleteNote(${note.id})">Delete</span> | 
+                <button onclick="setReminder(${note.id})">Set Reminder</button>
+            `;
+            notesList.appendChild(noteDiv);
+        });
+    }
+
+    function filterNotes() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const filteredNotes = notes.filter(note => note.text.toLowerCase().includes(searchTerm));
+        displayFilteredNotes(filteredNotes);
+    }
+
+    function displayFilteredNotes(filteredNotes) {
+        const notesList = document.getElementById('notesList');
+        notesList.innerHTML = '';
+        filteredNotes.forEach(note => {
+            const noteDiv = document.createElement('div');
+            noteDiv.className = 'note';
+            noteDiv.innerHTML = `
+                <p><strong>Note:</strong> ${note.text} <br><strong>Date:</strong> ${note.date}</p>
+                <span class="edit-button" onclick="editNote(${note.id})">Edit</span> | 
+                <span class="delete-button" onclick="deleteNote(${note.id})">Delete</span>
+            `;
+            notesList.appendChild(noteDiv);
+        });
+    }
+
+    function sortNotes() {
+        const sortBy = document.getElementById('sortSelect').value;
+        if (sortBy === 'date') {
+            notes.sort((a, b) => new Date(b.date) - new Date(a.date));
+        } else if (sortBy === 'priority') {
+            const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+            notes.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
+        }
+        displayNotes();
+    }
+
+    function editNote(noteId) {
+        const note = notes.find(n => n.id === noteId);
+        document.getElementById('noteText').value = note.text;
+        deleteNote(noteId);
+        showPage('newNote');
+    }
+
+    function deleteNote(noteId) {
+        const updatedNotes = notes.filter(n => n.id !== noteId);
+        localStorage.setItem('notes', JSON.stringify(updatedNotes));
+        displayNotes();
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('dark-mode');
+    }
+
+    function setReminder(noteId) {
+        const reminderTime = prompt("Set reminder time in minutes:");
+        if (reminderTime) {
+            const note = notes.find(n => n.id === noteId);
+            setTimeout(() => {
+                new Notification("Reminder", { body: `Reminder for your note: ${note.text}` });
+            }, reminderTime * 60000);
+        }
+    }
+
+    function exportNotes() {
+        const dataStr = JSON.stringify(notes);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'notes.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    function importNotes(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const importedNotes = JSON.parse(e.target.result);
+            notes.push(...importedNotes);
+            localStorage.setItem('notes', JSON.stringify(notes));
+            displayNotes();
+        };
+        reader.readAsText(file);
+    }
+
+    // Show the home page initially
+    showPage('home');
+</script>
+
+</body>
+</html>
